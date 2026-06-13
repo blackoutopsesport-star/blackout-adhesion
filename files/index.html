@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BLACKOUT OPS ESPORT — Adhésion 2026/2027</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Barlow:wght@300;400;500;600&display=swap');
   :root {
@@ -133,6 +134,7 @@
 </head>
 <body>
 
+<!-- Netlify Forms detection -->
 <form name="adhesion" netlify netlify-honeypot="bot-field" hidden>
   <input type="text" name="ref">
   <input type="text" name="type">
@@ -333,7 +335,7 @@
         <li>Autoriser l'association à utiliser mon image dans le cadre de ses activités de communication.</li>
         <li>Certifier l'exactitude des informations fournies.</li>
       </ul>
-      <div class="rgpd">Conformément au RGPD, les données personnelles collectées sont utilisées uniquement dans le cadre de la gestion de l'association et ne sont pas transmises à des tiers.</div>
+      <div class="rgpd">Conformément au RGPD, les données personnelles collectées sont utilisées uniquement dans le cadre de la gestion de l'association et ne sont pas transmises à des tiers. Vous disposez d'un droit d'accès, de rectification et de suppression de vos données.</div>
     </div>
     <div class="sig-block">
       <div class="sig-title">Signature électronique <span style="color:var(--blue)">*</span></div>
@@ -372,14 +374,6 @@
       <ul id="successSteps"></ul>
     </div>
     <button class="btn btn-primary btn-full" id="pdfBtn" onclick="downloadPDF()">📄 Télécharger mon bulletin PDF</button>
-    <div id="paymentBlock" style="margin-top:16px">
-      <div id="paymentLocked" style="background:var(--bg2);border:1px solid var(--border);padding:20px;text-align:center;display:none">
-        <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--grey-light);margin-bottom:8px">Cotisation annuelle</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);margin-bottom:4px">10 €</div>
-        <div style="font-size:12px;color:var(--grey);margin-bottom:16px">Paiement disponible à partir du 1er septembre 2026</div>
-        <button class="btn" style="background:var(--grey);color:var(--bg);width:100%;cursor:not-allowed;opacity:0.5" disabled>🔒 Paiement disponible le 01/09/2026</button>
-      </div>
-    </div>
     <p style="font-size:12px;color:var(--grey);margin-top:20px">Garde ce numéro de référence.<br><br>Toujours. 🖤 BLACKOUT OPS ESPORT</p>
   </div>
 
@@ -393,6 +387,9 @@ var sigDrawing = false;
 var sigLastX = 0, sigLastY = 0;
 var hasSig = false;
 var formData = {};
+
+// Init EmailJS
+emailjs.init('igLUerSJQgx2zepDV');
 
 var parcoursLabels = {
   membre: 'Adhésion Membre Actif',
@@ -531,6 +528,7 @@ function goPrev(from){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+// SIGNATURE
 function initSig(){
   var canvas = g('sigCanvas');
   if(!canvas || sigCtx) return;
@@ -541,6 +539,7 @@ function initSig(){
   sigCtx.lineWidth = 2.5;
   sigCtx.lineCap = 'round';
   sigCtx.lineJoin = 'round';
+
   function getPos(e){
     var r = canvas.getBoundingClientRect();
     var sx = canvas.width/r.width; var sy = canvas.height/r.height;
@@ -566,6 +565,7 @@ function clearSig(){
   var c=g('sigCanvas'); sigCtx.clearRect(0,0,c.width,c.height); hasSig=false;
 }
 
+// COLLECT ALL DATA
 function collectData(){
   var dob = gv('dob');
   formData = {
@@ -625,24 +625,28 @@ async function doSubmit(){
   var ref = 'BOP-'+new Date().getFullYear()+'-'+String(Math.floor(Math.random()*9000)+1000);
   formData.ref = ref;
 
-  var details = '';
-  if(parcours==='candidature') details = 'Pseudo: '+formData.pseudo+' | Roster: '+formData.jRosterLabel+' | Rang: '+(formData.jRang||'—');
-  else if(parcours==='staff') details = 'Poste: '+formData.sPoste;
-  else if(parcours==='membre') details = 'Discord: '+(formData.mDiscord||'—');
-  else if(parcours==='contact') details = 'Objet: '+formData.cObjet;
-
   // Discord webhook
-  var webhookPayload = {
+  // Build details for Discord + Email
+  var details = '';
+  if(parcours==='candidature') details = 'Pseudo: '+formData.pseudo+' | Roster: '+formData.jRosterLabel+' | Rang: '+(formData.jRang||'—')+' | Dispo: '+(formData.jDispo||'—')+' | Message: '+(formData.jMsg||'—');
+  else if(parcours==='staff') details = 'Poste: '+formData.sPoste+' | Dispo: '+(formData.sDispo||'—')+' | Expérience: '+(formData.sExp||'—')+' | Message: '+(formData.sMsg||'—');
+  else if(parcours==='membre') details = 'Discord: '+(formData.mDiscord||'—')+' | Message: '+(formData.mMsg||'—');
+  else if(parcours==='contact') details = 'Objet: '+formData.cObjet+' | Message: '+formData.cMsg;
+
+  var payload = {
     username:'BLACKOUT OPS — Adhésions',
     embeds:[{
-      title:'🖤 Nouvelle demande — '+parcoursLabels[parcours],
+      title:'🖤 Nouvelle demande — '+formData.parcoursLabel,
       color:3447003,
       fields:[
         {name:'📋 Référence',value:ref,inline:true},
-        {name:'📁 Type',value:parcoursLabels[parcours],inline:true},
-        {name:'👤 Nom',value:formData.prenom+' '+formData.nom,inline:true},
+        {name:'📁 Type',value:formData.parcoursLabel,inline:true},
+        {name:'\u200b',value:'\u200b',inline:false},
+        {name:'👤 Nom complet',value:formData.prenom+' '+formData.nom,inline:true},
+        {name:'📅 Naissance',value:formData.dob,inline:true},
         {name:'📧 Email',value:formData.email,inline:true},
         {name:'📞 Téléphone',value:formData.tel,inline:true},
+        {name:'✍️ Signature',value:'Apposée le '+formData.date+' à '+formData.heure,inline:false},
         {name:'📝 Détails',value:details||'—',inline:false}
       ],
       footer:{text:'BLACKOUT OPS ESPORT — Adhésion 2026/2027'},
@@ -654,35 +658,35 @@ async function doSubmit(){
     await fetch('https://discord.com/api/webhooks/1514338744646369502/Wr6HZhpPkoDLI5NMQdRXAylL4rJ0SmAv2HawZHxFPqOq3LDhamUagtkOh_X9auLMn1UK',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(webhookPayload)
+      body:JSON.stringify(payload)
     });
-  } catch(e){ console.warn('Webhook:', e.message); }
+  } catch(e){ console.warn('Webhook error (fonctionnera sur Netlify):', e.message); }
 
-  // Send to Netlify Function — NO PDF
+  // Formspree — envoi garanti
   try {
-    const resp = await fetch('/.netlify/functions/send-adhesion', {
+    const resp = await fetch('https://formspree.io/f/xlgkwgog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ref: ref,
         type: parcoursLabels[parcours]||parcours,
-        nom: gv('nom').toUpperCase(),
-        prenom: gv('prenom'),
+        nom: gv('prenom') + ' ' + gv('nom').toUpperCase(),
         email: gv('email'),
         tel: gv('tel'),
-        date: new Date().toLocaleDateString('fr-FR'),
-        heure: new Date().toLocaleTimeString('fr-FR'),
-        details: details
+        dob: gv('dob') ? new Date(gv('dob')).toLocaleDateString('fr-FR') : '',
+        details: details,
+        date: new Date().toLocaleDateString('fr-FR')
       })
     });
-    console.log('Function status:', resp.status);
+    if(resp.ok) console.log('Formspree OK');
+    else console.error('Formspree error:', resp.status);
   } catch(e) {
-    console.error('Function error:', e);
+    console.error('Formspree error:', e);
   }
 
   // Show success
   var msgs = {
-    membre:"Ta demande d'adhésion Membre Actif a bien été enregistrée. Le staff te recontactera sous 48h.",
+    membre:'Ta demande d\'adhésion Membre Actif a bien été enregistrée. Le staff te recontactera sous 48h.',
     candidature:'Ta candidature joueur a bien été reçue. Le staff étudiera ton profil et te recontactera sous 48h.',
     staff:'Ta candidature staff a bien été reçue. Le staff te recontactera sous 48h.',
     contact:'Ta prise de contact a bien été reçue. Le staff te répondra sous 48h.'
@@ -690,7 +694,7 @@ async function doSubmit(){
   var steps = {
     membre:['Le staff valide ta demande','Tu reçois ton numéro d\'adhérent','Ton rôle Discord est attribué','Ta carte membre est générée'],
     candidature:['Le staff étudie ton profil','Une session de test est organisée','Le roster et la direction valident','Si accepté — Licence Joueur Officiel attribuée'],
-    staff:['Le staff étudie ta candidature','Si validé — Licence Staff et rôle Discord attribués'],
+    staff:['Le staff étudie ta candidature','Entretien possible','Si validé — Licence Staff et rôle Discord attribués'],
     contact:['Le staff prend en compte ta demande','Tu reçois une réponse sous 48h']
   };
 
@@ -704,60 +708,187 @@ async function doSubmit(){
   (steps[parcours]||[]).forEach(function(s){ var li=document.createElement('li'); li.textContent=s; ul.appendChild(li); });
   g('successScreen').classList.add('show');
   window.scrollTo({top:0,behavior:'smooth'});
-
-  if(parcours === 'membre') {
-    var now = new Date();
-    var sep = new Date('2026-09-01');
-    if(now >= sep) {
-      g('paymentLocked').style.display = 'none';
-    } else {
-      g('paymentLocked').style.display = 'block';
-    }
-  }
 }
 
 function downloadPDF(){
   if(!formData.ref){ alert('Aucune donnée à exporter.'); return; }
   var d = formData;
+
   try {
-    var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
-    if(!jsPDF){ alert('PDF non disponible.'); return; }
+    var jsPDF = window.jspdf ? window.jspdf.jsPDF : jsPDF;
     var doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-    var W = 210, M = 18, Y = 0;
-    doc.setFillColor(10,15,26); doc.rect(0,0,W,30,'F');
+    var W = 210, M = 18, Y = 0, lh = 7;
+
+    function line(y){ doc.setDrawColor(200,200,200); doc.line(M,y,W-M,y); }
+    function blueLine(y){ doc.setDrawColor(59,130,246); doc.setLineWidth(0.8); doc.line(M,y,W-M,y); doc.setLineWidth(0.2); }
+    function sectionTitle(txt, y){
+      doc.setFillColor(10,15,26); doc.rect(M,y-4,W-M*2,7,'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text(txt.toUpperCase(),M+2,y+0.5);
+      doc.setTextColor(0,0,0);
+      return y+9;
+    }
+    function field(label, val, x, y, w){
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
+      doc.text(label, x, y);
+      doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
+      var txt = val || '';
+      doc.text(txt, x, y+4);
+      doc.setDrawColor(180,180,180); doc.setLineWidth(0.2);
+      doc.line(x, y+5, x+w, y+5);
+      doc.setFont('helvetica','normal');
+    }
+    function checkBox(label, checked, x, y){
+      doc.setDrawColor(100,100,100); doc.setLineWidth(0.3);
+      doc.rect(x, y-3, 3.5, 3.5);
+      if(checked){ doc.setTextColor(59,130,246); doc.setFontSize(9); doc.text('✓',x+0.3,y-0.1); }
+      doc.setTextColor(0,0,0); doc.setFontSize(8); doc.text(label, x+5, y);
+    }
+
+    // HEADER
+    doc.setFillColor(10,15,26);
+    doc.rect(0,0,W,30,'F');
     doc.setTextColor(232,237,245); doc.setFontSize(18); doc.setFont('helvetica','bold');
     doc.text('BLACKOUT OPS ESPORT', W/2, 12, {align:'center'});
     doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(156,163,175);
-    doc.text('Association loi 1908 — 26 rue de la ferme Roehri, 67500 Marienthal', W/2, 20, {align:'center'});
+    doc.text('Association de droit local alsacien-mosellan (loi du 19 avril 1908)', W/2, 18, {align:'center'});
+    doc.text('26 rue de la ferme Roehri — 67500 Marienthal', W/2, 23, {align:'center'});
     doc.setFillColor(59,130,246); doc.rect(0,30,W,1.5,'F');
+
+    // REF
     doc.setTextColor(59,130,246); doc.setFontSize(8); doc.setFont('helvetica','bold');
     doc.text('Réf. '+d.ref+' — Saison 2026/2027', W-M, 37, {align:'right'});
+
+    // TITLE
     doc.setTextColor(10,15,26); doc.setFontSize(16); doc.setFont('helvetica','bold');
     doc.text("BULLETIN D'ADHÉSION", W/2, 44, {align:'center'});
     doc.setFontSize(9); doc.setTextColor(59,130,246);
-    doc.text((d.parcoursLabel||'').toUpperCase(), W/2, 50, {align:'center'});
+    doc.text(d.parcoursLabel.toUpperCase(), W/2, 50, {align:'center'});
+    doc.setDrawColor(59,130,246); doc.setLineWidth(0.5);
+    doc.line(M,52,W-M,52);
+
     Y = 60;
-    var fields = [
-      ['Nom', d.nom], ['Prénom', d.prenom], ['Date de naissance', d.dob],
-      ['Email', d.email], ['Téléphone', d.tel], ['Adresse', (d.adresse||'')+(d.cp?' '+d.cp:'')+(d.ville?' '+d.ville:'')]
-    ];
-    fields.forEach(function(f){
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
-      doc.text(f[0]+' :', M, Y);
-      doc.setTextColor(0,0,0); doc.setFont('helvetica','bold');
-      doc.text(f[1]||'', M+50, Y);
-      doc.setDrawColor(180,180,180); doc.setLineWidth(0.2); doc.line(M, Y+2, W-M, Y+2);
-      Y += 10;
-    });
-    Y += 5;
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50);
-    doc.text('Signé électroniquement le '+d.date+' à '+d.heure, M, Y); Y+=8;
-    if(d.sigData && d.sigData.length > 100){
-      try{ doc.addImage(d.sigData, 'PNG', M, Y, 80, 25); Y+=30; }catch(e){}
+
+    // TYPE ADHESION
+    Y = sectionTitle("TYPE D'ADHÉSION", Y);
+    var types = [{l:'Joueur compétitif',v:'candidature'},{l:'Staff',v:'staff'},{l:'Membre actif',v:'membre'},{l:'Membre d\'honneur',v:'contact'}];
+    var tx = M; types.forEach(function(t){ checkBox(t.l, d.parcours===t.v, tx, Y); tx+=48; }); Y+=10;
+
+    // INFOS PERSO
+    Y = sectionTitle('INFORMATIONS PERSONNELLES', Y);
+    field('Nom :', d.nom, M, Y, 78); field('Prénom :', d.prenom, M+88, Y, 78); Y+=12;
+    field('Date de naissance :', d.dob, M, Y, 78); field('Lieu de naissance :', d.lieu, M+88, Y, 78); Y+=12;
+    field('Nationalité :', d.nat, M, Y, 78); field('Adresse :', d.adresse, M+88, Y, 78); Y+=12;
+    field('Code postal / Ville :', d.cp+(d.ville?' '+d.ville:''), M, Y, 78); field('Téléphone :', d.tel, M+88, Y, 78); Y+=12;
+    field('Email :', d.email, M, Y, W-M*2); Y+=12;
+    field('Pseudo in-game :', d.parcours==='candidature'?d.pseudo:'', M, Y, 78); field('Jeu principal :', d.parcours==='candidature'?'Call of Duty':'', M+88, Y, 78); Y+=12;
+
+    // MINEURS
+    if(d.isMineur){
+      Y = sectionTitle('POUR LES MEMBRES MINEURS (MOINS DE 18 ANS)', Y);
+      field('Nom représentant légal :', d.rlNom, M, Y, 78); field('Prénom :', d.rlPrenom, M+88, Y, 78); Y+=12;
+      field('Téléphone :', d.rlTel, M, Y, 78); field('Email :', d.rlEmail, M+88, Y, 78); Y+=12;
+      field('Lien avec le mineur :', d.rlLien, M, Y, W-M*2); Y+=12;
     }
-    doc.save('bulletin_'+d.prenom+'_'+d.nom+'_'+d.ref+'.pdf');
+
+    // ROSTER
+    Y = sectionTitle('AFFECTATION ROSTER (SI JOUEUR COMPÉTITIF)', Y);
+    var rosters = [{l:'Roster OPS (Div. 4)',v:'ops'},{l:'Roster PRIME (Div. 10)',v:'prime'},{l:'Roster VOÏD (Div. 8)',v:'void'},{l:'En attente',v:'attente'}];
+    var rx = M; rosters.forEach(function(r){ checkBox(r.l, d.jRoster===r.v, rx, Y); rx+=46; }); Y+=10;
+
+    // COTISATION
+    Y = sectionTitle('COTISATION ANNUELLE', Y);
+    var cots = [{l:'Joueur/Staff 20 €',v:['candidature','staff']},{l:'Membre actif 10 €',v:['membre']},{l:'Mineur 10 €',v:[]}];
+    var cx = M; cots.forEach(function(c){ checkBox(c.l, c.v.indexOf(d.parcours)>=0, cx, Y); cx+=52; }); Y+=10;
+    field('Mode de règlement :', '', M, Y, 78); field('Date de règlement :', '', M+88, Y, 50); field('N° adhérent :', '', M+148, Y, 40); Y+=12;
+
+    // Check page
+    if(Y > 220){ doc.addPage(); Y = 20; }
+
+    // ENGAGEMENTS
+    Y = sectionTitle('ENGAGEMENTS DU MEMBRE', Y);
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50);
+    doc.text('En adhérant à l\'association BLACKOUT OPS ESPORT, je déclare :', M, Y); Y+=5;
+    var engs = [
+      'Avoir pris connaissance des statuts et du règlement intérieur et les accepter sans réserve ;',
+      'M\'engager à respecter les valeurs et les règles de l\'association ;',
+      'Autoriser l\'association à utiliser mon image dans le cadre de ses activités de communication ;',
+      'Certifier l\'exactitude des informations fournies dans le présent bulletin.'
+    ];
+    engs.forEach(function(e){ doc.text('• '+e, M+3, Y); Y+=5; });
+    doc.setFontSize(7); doc.setTextColor(130,130,130);
+    doc.text('Conformément au RGPD, les données personnelles collectées sont utilisées uniquement dans le cadre de la gestion de l\'association.', M, Y, {maxWidth:W-M*2}); Y+=8;
+
+    // Check page
+    if(Y > 220){ doc.addPage(); Y = 20; }
+
+    // SIGNATURES
+    Y = sectionTitle('SIGNATURES', Y);
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
+    doc.text('Fait à', M, Y);
+    // Champ Fait à remplissable
+    doc.setDrawColor(180,180,180); doc.setLineWidth(0.3);
+    doc.line(M+12, Y+1, M+65, Y+1);
+    doc.text('le', M+70, Y); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+    doc.text(d.date, M+75, Y); doc.setFont('helvetica','normal');
+    Y+=10;
+
+    var sigColW = (W-M*2-10)/2;
+    // Membre sig
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(50,50,50);
+    doc.text('Signature du membre', M, Y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text('(Précédée de « Lu et approuvé »)', M, Y+4);
+    // Lu et approuvé line
+    doc.setFontSize(8); doc.setTextColor(50,50,50);
+    doc.text('Lu et approuvé :', M, Y+12);
+    doc.setDrawColor(180,180,180); doc.setLineWidth(0.3);
+    doc.line(M+28, Y+13, M+sigColW, Y+13);
+    // Signature box — larger to accommodate
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.rect(M, Y+16, sigColW, 22);
+    if(d.sigData && d.sigData.length > 100){
+      // Convert white signature to black by drawing on white background
+      try{
+        // Draw white bg first then image
+        doc.setFillColor(255,255,255); doc.rect(M+1, Y+17, sigColW-2, 20, 'F');
+        doc.addImage(d.sigData, 'PNG', M+1, Y+17, sigColW-2, 20);
+      }catch(e){}
+    }
+    doc.setFontSize(7); doc.setTextColor(59,130,246);
+    doc.text('Signature électronique — '+d.date+' à '+d.heure, M, Y+42);
+
+    // Président sig
+    var px = M+sigColW+10;
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(50,50,50);
+    doc.text('Visa du Président', px, Y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text('GUEDJ Stéphane', px, Y+4);
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.rect(px, Y+6, sigColW, 25);
+    doc.setFontSize(8); doc.setTextColor(150,150,150);
+    doc.text('Signature : _______________', px+5, Y+22);
+    Y+=40;
+
+    // Mineur sig
+    if(d.isMineur && Y+30 < 280){
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50);
+      doc.text('Pour les membres mineurs — Signature du représentant légal :', M, Y); Y+=5;
+      doc.setDrawColor(200,200,200); doc.line(M,Y+15,M+100,Y+15); Y+=20;
+    }
+
+    // ADMIN BOX
+    if(Y+20 > 280){ doc.addPage(); Y=20; }
+    doc.setFillColor(245,245,245); doc.rect(M,Y,W-M*2,18,'F');
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.rect(M,Y,W-M*2,18);
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(50,50,50);
+    doc.text('RÉSERVÉ À L\'ADMINISTRATION', M+3, Y+5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
+    doc.text('N° adhérent :', M+3, Y+12); doc.line(M+30, Y+13, M+70, Y+13);
+    doc.text('Date d\'enregistrement :', M+80, Y+12); doc.line(M+115, Y+13, M+160, Y+13);
+
+    doc.save('bulletin_adhesion_'+d.prenom+'_'+d.nom+'_'+d.ref+'.pdf');
   } catch(err){
-    alert('Erreur PDF : '+err.message);
+    alert('Erreur lors de la génération du PDF : '+err.message);
+    console.error(err);
   }
 }
 
