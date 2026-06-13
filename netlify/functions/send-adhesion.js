@@ -12,7 +12,7 @@ exports.handler = async (event) => {
 
   const payload = {
     from: 'BLACKOUT OPS <onboarding@resend.dev>',
-    to: ['blackoutopsesport@gmail.com'],
+    to: to: [process.env.GMAIL_USER],,
     subject: `[ADHESION] ${ref} - ${prenom} ${nom}`,
     html: `<div style="font-family:Arial;background:#0A0F1A;color:#E8EDF5;padding:32px;border-radius:8px">
       <h2 style="color:#3B82F6">BLACKOUT OPS ESPORT</h2>
